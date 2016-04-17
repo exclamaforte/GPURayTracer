@@ -1,20 +1,3 @@
-
-function shape(id) {
-    return [id, arguments.length + 1].concat(Array.prototype.slice.call(arguments, 1));
-}
-
-function touchingCircles(n,rad) {
-    var ret = [n];
-    for (i = 0; i < n; i++) {
-        ret = ret.concat(shape(ObjTyp.SPHERE, 1.0,0.0,0.0,0.2, 0.7 ,0.1,1.0, 100 + 2 * i * rad,500,500,rad));
-    }
-    return ret;
-}
-
-var ObjTyp = {'EMPTY': 0.0, 'SPHERE': 1.0,
-              'CUBOID': 2.0, 'CYLINDER': 3.0,
-              'CONE': 4.0, 'PYRAMID': 5.0};
-
 var fps = { startTime : 0, frameNumber : 0,
             getFPS : function() {
                 this.frameNumber++;
@@ -27,32 +10,9 @@ var fps = { startTime : 0, frameNumber : 0,
             }
           };
 
-var camera = [
-    //-150,-225,-150,    // x,y,z coordinates
-        -20, 0,0,
-    1,0,0,
-    //0.5773502691896258, 0.5773502691896258, 0.5773502691896258,// Direction normal vector
-    45  // field of view : example 45
-];
-//x[0],y[1],z[2]
-//xdir[3],ydir[4],zdir[5]
-//fov[6]
-
-
-
-var objects = [3]
-        .concat(shape(ObjTyp.SPHERE, 1.0,0.0,0.0,0.2, 0.7 ,0.1,1.0, 100,500,500,40))
-        .concat(shape(ObjTyp.SPHERE, 0.0,0.0,1.0,0.2,0.7,0.1,1.0, 200,600,200,40))
-        .concat(shape(ObjTyp.SPHERE, 0.333,0.167,0.5,0.2,0.7,0.1,1.0, 0,0,0, 5));
-
-var WIDTH = 800;
-var HEIGHT = 600;
-
-
 var selection = 0;
 
 function change( el ) {
-
     if ( el.value === "Using CPU" ) {
         selection = 1;
         el.value = "Using GPU";
@@ -61,6 +21,40 @@ function change( el ) {
         el.value = "Using CPU";
     }
 }
+var paused = false;
+function pause(el) {
+    if ( el.value === "Pause") {
+        paused = true;
+        el.value = "Resume";
+    } else {
+        paused = false;
+        el.value = "Pause";
+        renderLoop();
+    }
+}
+
+window.onkeydown = function (e) {
+    var code = e.keyCode ? e.keyCode : e.which;
+    console.log(code);
+    if (code === 38) { //up key
+        lights[1] += 1;
+    } else if (code === 40) { //down key
+        lights[1] -= 1;
+    } else if (code === 37) { //left key
+        lights[2] += 1;
+    } else if (code === 39) { //right key
+        lights[2] -= 1;
+    } else if (code === 81) { //Q key
+        lights[3] += 1;
+    } else if (code === 87) { //W key
+        lights[3] -= 1;
+    } else if (code === 49) { //W key
+        lights[1] = 0;
+        lights[2] = 10;
+        lights[3] = 0;
+    }
+    console.log(lights);
+};
 
 var gpu = new GPU();
 
@@ -170,15 +164,7 @@ function doit(mode) {
         for (var objNum = 0; objNum < this.constants.OBJCOUNT; objNum += 1) {
             var objLen = Objects[objStart + 1],
                 objType = Objects[objStart];
-            if (objType == this.constants.EMPTY) {
-            }
-            else if (objType == this.constants.SPHERE) {
-                // var objects = [
-                //     2, // number of objects
-                //     ObjTyp.SPHERE,      13, 1.0,0.0,0.0,0.2, 0.7 ,0.1,1.0, 100,500,500,40,
-                //     // typ0           recsz1 r2 g3  b4 spec5 lamb6 amb7,opac8, x9,  y10,  z11,rad12,
-                //     ObjTyp.SPHERE,      13, 0.0,0.0,1.0,0.2,0.7,0.1,1.0, 200,600,200,20            // typ,recsz,r,g,b,spec,lamb,amb,opac, x,y,z,rad,
-                // ];
+            if (objType == this.constants.SPHERE) {
                 var eyeToCenterX = Objects[objStart + 9] - Camera[0],
                     eyeToCenterY = Objects[objStart + 10] - Camera[1],
                     eyeToCenterZ = Objects[objStart + 11] - Camera[2],
@@ -188,20 +174,16 @@ function doit(mode) {
                                 eyeToCenterX, eyeToCenterY, eyeToCenterZ),
                     discriminant = sqr(Objects[objStart + 12]) - eoDot + (vDot * vDot);
                 if (discriminant >= 0) {
-                    if (dist > vDot - Math.sqrt(discriminant)) {
-                        dist = vDot - Math.sqrt(discriminant);
+                    var dd = vDot - Math.sqrt(discriminant);
+                    if (dist > dd) {
+                        dist = dd;
                         closest = objStart;
                     }
                     bounced = 1;
                 }
-            } else if (objType == this.constants.CUBOID) {
-            } else if (objType == this.constants.CYLINDER) {
-            } else if (objType == this.constants.CONE) {
-            } else if (objType == this.constants.PYRAMID) {
             }
             objStart += objLen;
         }
-        //good
         if (bounced != 0) {
             var pointAtTimeX = Camera[0] + rayX * dist,
                 pointAtTimeY = Camera[1] + rayY * dist,
@@ -241,45 +223,40 @@ function doit(mode) {
                     for (var objNum1 = 0; objNum1 < this.constants.OBJCOUNT; objNum1 += 1) {
                         var objLen1 = Objects[objStart1 + 1],
                             objType1 = Objects[objStart1];
-                        // if (objType1 == this.constants.EMPTY) {
-                        // }
-                        // if (objType1 == this.constants.SPHERE) {
-                        //     // var objects = [
-                        //     //     2, // number of objects
-                        //     //     ObjTyp.SPHERE,      13, 1.0,0.0,0.0,0.2, 0.7 ,0.1,1.0, 100,500,500,40,
-                        //     //     // typ0           recsz1 r2 g3  b4 spec5 lamb6 amb7,opac8, x9,  y10,  z11,rad12,
-                        //     //     ObjTyp.SPHERE,      13, 0.0,0.0,1.0,0.2,0.7,0.1,1.0, 200,600,200,20            // typ,recsz,r,g,b,spec,lamb,amb,opac, x,y,z,rad,
-                        //     // ];
-                        //     var eyeToCenterX1 = Objects[objStart1 + 9] - pointAtTimeX,
-                        //         eyeToCenterY1 = Objects[objStart1 + 10] - pointAtTimeY,
-                        //         eyeToCenterZ1 = Objects[objStart1 + 11] - pointAtTimeZ,
-                        //         vDot1 = dot(eyeToCenterX1, eyeToCenterY1, eyeToCenterZ1,
-                        //                     circleToLightX, circleToLightY, circleToLightZ),
-                        //         eoDot1 = dot(eyeToCenterX1, eyeToCenterY1, eyeToCenterZ1,
-                        //                      eyeToCenterX1, eyeToCenterY1, eyeToCenterZ1),
-                        //         discriminant1 = sqr(Objects[objStart1 + 12]) - eoDot1 + (vDot1 * vDot1);
-
-                        //     if (discriminant1 >= 0) {
-                        //         dist1 = vDot1 - Math.sqrt(discriminant1);
-                        //         blocked = 1;
-                        //     }
-                        // } else if (objType1 == this.constants.CUBOID) {
-                        // } else if (objType1 == this.constants.CYLINDER) {
-                        // } else if (objType1 == this.constants.CONE) {
-                        // } else if (objType1 == this.constants.PYRAMID) {
-                        // }
+                        if (objStart1 != closest) {
+                            if (objType1 == this.constants.SPHERE) {
+                                var pointToCenterX = Objects[objStart1 + 9] - pointAtTimeX,
+                                    pointToCenterY = Objects[objStart1 + 10] - pointAtTimeY,
+                                    pointToCenterZ = Objects[objStart1 + 11] - pointAtTimeZ,
+                                    vDot1 = dot(pointToCenterX, pointToCenterY, pointToCenterZ,
+                                                circleToLightX, circleToLightY, circleToLightZ),
+                                    eoDot1 = dot(pointToCenterX, pointToCenterY, pointToCenterZ,
+                                                 pointToCenterX, pointToCenterY, pointToCenterZ),
+                                    discriminant1 = sqr(Objects[objStart1 + 12]) - eoDot1 + sqr(vDot1);
+                                if (discriminant1 >= 0) {
+                                    blocked = 1;
+                                    if (objNum1 == 0) {
+                                        this.color(255,0,0);
+                                    } else if (objNum1 == 1) {
+                                        this.color(0,255,0);
+                                    } else if (objNum1 == 2){
+                                        this.color(0,0, 255);
+                                    }
+                                }
+                            }
+                        }
                         objStart1 += objLen1;
                     }
                     if (blocked == 0) {
                         //light is not blocked
-                        var contribution = 10 * dot(circleToLightX,circleToLightY,circleToLightZ,
-                                                    normalX,normalY,normalZ) / sqr(dist1);
-                        // contribution = contribution * 
+                        //var contribution = 100 * dot(circleToLightX,circleToLightY,circleToLightZ, normalX,normalY,normalZ) / sqr(dist1);
+                        var contribution = 1;
                         if (contribution > 0) {
                             lambertAmountR += contribution * Lights[lightNum + 3];
                             lambertAmountG += contribution * Lights[lightNum + 4];
                             lambertAmountB += contribution * Lights[lightNum + 5];
                         }
+                        this.color(0,0,0);
                     }
                     lightNum += 6;
                 }
@@ -297,24 +274,18 @@ function doit(mode) {
             colorR = 255;
             colorG = 255;
             colorB = 255;
+            this.color(colorR, colorG, colorB);
             //TOOD might have to add something if dont want it to be left as white
         }
-        //Possibly should have different lambertAmount for each Color to support other colored lights
         colorR += Objects[closest + 2] * (lambertAmountR * Objects[closest + 6] + Objects[closest + 7]);
         colorG += Objects[closest + 3] * (lambertAmountG * Objects[closest + 6] + Objects[closest + 7]);
         colorB += Objects[closest + 4] * (lambertAmountB * Objects[closest + 6] + Objects[closest + 7]);
         //}
 
-        this.color(colorR, colorG, colorB);
+        //this.color(colorR, colorG, colorB);
     }, opt);
     return y;
 }
-var lights = [
-    1,                         // number of lights
-    // 200,200,200, 0,1,0,        // light 1, x,y,z location, and rgb colour (green)
-    // 100,100,100, 1,1,1,        // light 2, x,y,z location, and rgb colour (white)
-        -10,0,0,  10,10,10
-];
 var precompute = generatePrecompute(camera,lights,objects);
 
 var mykernel = doit("gpu");
@@ -326,6 +297,7 @@ console.log("run1");
 
 var f = document.querySelector("#fps");
 var i = 0;
+var camerax = 0;
 function renderLoop() {
     f.innerHTML = fps.getFPS();
     if (selection === 0) {
@@ -341,14 +313,21 @@ function renderLoop() {
         newCanvas = mykernel.getCanvas();
         bdy.replaceChild(newCanvas, cv);
     }
-    i = (i + .1);
-    lights[1] = 15 * Math.sin(i) - 25;
-    console.log(lights);
+    // i += .2;
+    // lights[0] = 10 * Math.cos(i);
+    // lights[1] = 10 * Math.sin(i);
     //objects[10] = (objects[10]+2) % 900;
     //objects[24] = (objects[24]+2) % 700;
+    // camerax += .1;
+    // camera[0] = 20 * Math.cos(camerax);
+    // camera[1] = 20 * Math.sin(camerax);
+
+
 
     precompute = generatePrecompute(camera,lights,objects);
     //setTimeout(renderLoop,1);            // Uncomment this line, and comment the next line
-    requestAnimationFrame(renderLoop);     // to see how fast this could run...
+    if (!paused) {
+        requestAnimationFrame(renderLoop);     // to see how fast this could run...
+    }
 }
 window.onload = renderLoop;
