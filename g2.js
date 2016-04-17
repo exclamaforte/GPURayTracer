@@ -36,24 +36,24 @@ function pause(el) {
 window.onkeydown = function (e) {
     var code = e.keyCode ? e.keyCode : e.which;
     console.log(code);
-    if (code === 38) { //up key
+    if (code === 38) { //up key, towards
         lights[1] += 1;
-    } else if (code === 40) { //down key
+    } else if (code === 40) { //down key, away
         lights[1] -= 1;
-    } else if (code === 37) { //left key
+    } else if (code === 37) { //left key, up
         lights[2] += 1;
-    } else if (code === 39) { //right key
+    } else if (code === 39) { //right key, down
         lights[2] -= 1;
-    } else if (code === 81) { //Q key
+    } else if (code === 81) { //Q key, left
         lights[3] += 1;
-    } else if (code === 87) { //W key
+    } else if (code === 87) { //W key, right
         lights[3] -= 1;
-    } else if (code === 49) { //W key
+    } else if (code === 49) { //1 key
         lights[1] = 0;
         lights[2] = 10;
         lights[3] = 0;
     }
-    console.log(lights);
+    console.log(objects);
 };
 
 var gpu = new GPU();
@@ -99,7 +99,7 @@ function testVector() {
     console.log(unitVector(vector(1,1,1)));
 }
 
-function generatePrecompute(camera, lights, objects) {
+function generatePrecompute(camera, objects, objects) {
     var eye = unitVector(vectorSub(vector(camera[3], camera[4], camera[5]),
                                    vector(camera[0], camera[1], camera[2]))),
         right = unitVector(crossProduct(eye, {x: 0, y: 1, z: 0})),
@@ -233,15 +233,8 @@ function doit(mode) {
                                     eoDot1 = dot(pointToCenterX, pointToCenterY, pointToCenterZ,
                                                  pointToCenterX, pointToCenterY, pointToCenterZ),
                                     discriminant1 = sqr(Objects[objStart1 + 12]) - eoDot1 + sqr(vDot1);
-                                if (discriminant1 >= 0) {
+                                if (discriminant1 >= 0 && vDot1 >= 0 && vDot1 <= dist1) {
                                     blocked = 1;
-                                    if (objNum1 == 0) {
-                                        this.color(255,0,0);
-                                    } else if (objNum1 == 1) {
-                                        this.color(0,255,0);
-                                    } else if (objNum1 == 2){
-                                        this.color(0,0, 255);
-                                    }
                                 }
                             }
                         }
@@ -249,14 +242,13 @@ function doit(mode) {
                     }
                     if (blocked == 0) {
                         //light is not blocked
-                        //var contribution = 100 * dot(circleToLightX,circleToLightY,circleToLightZ, normalX,normalY,normalZ) / sqr(dist1);
-                        var contribution = 1;
+                        var contribution = 100 * dot(circleToLightX,circleToLightY,circleToLightZ, normalX,normalY,normalZ) / sqr(dist1);
+                        //var contribution = 1;
                         if (contribution > 0) {
                             lambertAmountR += contribution * Lights[lightNum + 3];
                             lambertAmountG += contribution * Lights[lightNum + 4];
                             lambertAmountB += contribution * Lights[lightNum + 5];
                         }
-                        this.color(0,0,0);
                     }
                     lightNum += 6;
                 }
@@ -281,8 +273,7 @@ function doit(mode) {
         colorG += Objects[closest + 3] * (lambertAmountG * Objects[closest + 6] + Objects[closest + 7]);
         colorB += Objects[closest + 4] * (lambertAmountB * Objects[closest + 6] + Objects[closest + 7]);
         //}
-
-        //this.color(colorR, colorG, colorB);
+        this.color(colorR, colorG, colorB);
     }, opt);
     return y;
 }
@@ -313,16 +304,14 @@ function renderLoop() {
         newCanvas = mykernel.getCanvas();
         bdy.replaceChild(newCanvas, cv);
     }
-    // i += .2;
-    // lights[0] = 10 * Math.cos(i);
-    // lights[1] = 10 * Math.sin(i);
+    //i += .01;
+    //lights[1] = 10 * Math.cos(i);
+    //lights[2] = 10 * Math.sin(i);
     //objects[10] = (objects[10]+2) % 900;
     //objects[24] = (objects[24]+2) % 700;
-    // camerax += .1;
-    // camera[0] = 20 * Math.cos(camerax);
-    // camera[1] = 20 * Math.sin(camerax);
-
-
+    camerax += .05;
+    camera[0] = 20 * Math.cos(camerax);
+    camera[1] = 20 * Math.sin(camerax);
 
     precompute = generatePrecompute(camera,lights,objects);
     //setTimeout(renderLoop,1);            // Uncomment this line, and comment the next line
