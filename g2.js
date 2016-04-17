@@ -62,18 +62,21 @@ function sqr(x) {
     return x*x;
 }
 
+function squareRoot(x1) {
+    return Math.sqrt(x1);
+}
 function dist(x1,y1,z1,x2,y2,z2) {
-    return Math.sqrt(sqr(x1 - x2) + sqr(y1 - y2) + sqr(z1 - z2));
+    return squareRoot(sqr(x1 - x2) + sqr(y1 - y2) + sqr(z1 - z2));
 }
 function dot(x1,y1,z1,x2,y2,z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
 }
 
-function squareRoot(x1) {
-    return Math.sqrt(x1);
-}
 function size(x1,y1,z1) {
     return squareRoot(sqr(x1) + sqr(y1) + sqr(z1));
+}
+function projDist (x1,y1,z1,x2,y2,z2) {
+    return dot(x1,y1,z1,x2,y2,z2) / sqr(size(x2,y2,z2));
 }
 
 gpu.addFunction(sqr);
@@ -81,6 +84,7 @@ gpu.addFunction(dist);
 gpu.addFunction(size);
 gpu.addFunction(dot);
 gpu.addFunction(squareRoot);
+gpu.addFunction(projDist);
 function vector(x1,y1,z1) { return {x: x1, y: y1, z: z1}; }
 function vectorSub(v1, v2) {return {x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z}; }
 function unitVector(v) {
@@ -174,7 +178,7 @@ function doit(mode) {
                                 eyeToCenterX, eyeToCenterY, eyeToCenterZ),
                     discriminant = sqr(Objects[objStart + 12]) - eoDot + (vDot * vDot);
                 if (discriminant >= 0) {
-                    var dd = vDot - Math.sqrt(discriminant);
+                    var dd = vDot - squareRoot(discriminant);
                     if (dist > dd) {
                         dist = dd;
                         closest = objStart;
@@ -277,10 +281,123 @@ function doit(mode) {
     }, opt);
     return y;
 }
+function calculateSegments(mode) {
+    var opt = {
+        dimensions: [CHUNKS,CHUNKS],
+        debug: true,
+        mode: mode,
+        constants: { OBJCOUNT: objects[0], SPHERE: ObjTyp.SPHERE,   CUBOID: ObjTyp.CUBOID,
+                     CYLINDER: ObjTyp.CYLINDER,   CONE: ObjTyp.CONE,   PYRAMID: ObjTyp.PYRAMID,
+                     WIDTH: WIDTH, HEIGHT: HEIGHT, MAXVAL: 2147483646, PWPC:PWPC, PHPC:PHPC}
+    };
+
+    var y = gpu.createKernel(function(Camera,Objects,PreCompute) {
+        var tlx = this.thread.x * this.constants.PWPC,
+            tly = this.thread.y * this.constants.PHPC;
+        var xScale = tlx * PreCompute[15] - PreCompute[11],
+            yScale = tly * PreCompute[16] - PreCompute[12];
+        var xcompX = PreCompute[3] * xScale,
+            xcompY = PreCompute[4] * xScale,
+            xcompZ = PreCompute[5] * xScale,
+            ycompX = PreCompute[6] * yScale,
+            ycompY = PreCompute[7] * yScale,
+            ycompZ = PreCompute[8] * yScale;
+        var topLeftRayXU = xcompX + ycompX + PreCompute[0],
+            topLeftRayYU = xcompY + ycompY + PreCompute[1],
+            topLeftRayZU = xcompZ + ycompZ + PreCompute[2],
+            topLeftLength = squareRoot(sqr(topLeftRayXU) + sqr(topLeftRayYU) + sqr(topLeftRayZU));
+        topLeftRayXU /= topLeftLength;
+        topLeftRayYU /= topLeftLength;
+        topLeftRayZU /= topLeftLength;
+
+        var trx = (this.thread.x + 1) * this.constants.PWPC,
+            trY = this.thread.y * this.constants.PHPC;
+        xScale = trx * PreCompute[15] - PreCompute[11],
+        yScale = trY * PreCompute[16] - PreCompute[12];
+        xcompX = PreCompute[3] * xScale,
+        xcompY = PreCompute[4] * xScale,
+        xcompZ = PreCompute[5] * xScale,
+        ycompX = PreCompute[6] * yScale,
+        ycompY = PreCompute[7] * yScale,
+        ycompZ = PreCompute[8] * yScale;
+        var topRightRayXU = xcompX + ycompX + PreCompute[0],
+            topRightRayYU = xcompY + ycompY + PreCompute[1],
+            topRightRayZU = xcompZ + ycompZ + PreCompute[2],
+            topRightLength = squareRoot(sqr(topRightRayXU) + sqr(topRightRayYU) + sqr(topRightRayZU));
+        topRightRayXU /= topRightLength;
+        topRightRayYU /= topRightLength;
+        topRightRayZU /= topRightLength;
+
+        var blx = this.thread.x * this.constants.PWPC,
+            bly = (this.thread.y + 1) * this.constants.PHPC;
+        xScale = blx * PreCompute[15] - PreCompute[11],
+        yScale = bly * PreCompute[16] - PreCompute[12];
+        xcompX = PreCompute[3] * xScale,
+        xcompY = PreCompute[4] * xScale,
+        xcompZ = PreCompute[5] * xScale,
+        ycompX = PreCompute[6] * yScale,
+        ycompY = PreCompute[7] * yScale,
+        ycompZ = PreCompute[8] * yScale;
+        var bottomLeftRayXU = xcompX + ycompX + PreCompute[0],
+            bottomLeftRayYU = xcompY + ycompY + PreCompute[1],
+            bottomLeftRayZU = xcompZ + ycompZ + PreCompute[2],
+            bottomLeftLength = squareRoot(sqr(bottomLeftRayXU) + sqr(bottomLeftRayYU) + sqr(bottomLeftRayZU));
+        bottomLeftRayXU /= bottomLeftLength;
+        bottomLeftRayYU /= bottomLeftLength;
+        bottomLeftRayZU /= bottomLeftLength;
+
+        var objStart = 1;
+        for (var objNum = 0; objNum < this.constants.OBJCOUNT; objNum += 1) {
+            var objType = Objects[objStart],
+                objLen = Objects[objStart + 1];
+            if (objType == this.constants.SPHERE) {
+                var eyeToCenterX = Objects[objStart + 9] - Camera[0],
+                    eyeToCenterY = Objects[objStart + 10] - Camera[1],
+                    eyeToCenterZ = Objects[objStart + 11] - Camera[2],
+                    objLength = squareRoot(sqr(eyeToCenterX) + sqr(eyeToCenterY) + sqr(eyeToCenterZ)),
+                    topLeftRayX = objLength * topLeftRayXU,
+                    topLeftRayY = objLength * topLeftRayYU,
+                    topLeftRayZ = objLength * topLeftRayZU,
+                    topRightRayX = objLength * topRightRayXU,
+                    topRightRayY = objLength * topRightRayYU,
+                    topRightRayZ = objLength * topRightRayZU,
+                    bottomLeftRayX = objLength * bottomLeftRayXU,
+                    bottomLeftRayY = objLength * bottomLeftRayYU,
+                    bottomLeftRayZ = objLength * bottomLeftRayZU;
+                var TLtoBLX = bottomLeftRayX - topLeftRayX,
+                    TLtoBLY = bottomLeftRayY - topLeftRayY,
+                    TLtoBLZ = bottomLeftRayZ - topLeftRayZ,
+                    TLtoTRX = topRightRayX - topLeftRayX,
+                    TLtoTRY = topRightRayY - topLeftRayY,
+                    TLtoTRZ = topRightRayZ - topLeftRayZ,
+                    TLtoObjX = eyeToCenterX - topLeftRayX,
+                    TLtoObjY = eyeToCenterY - topLeftRayY,
+                    TLtoObjZ = eyeToCenterZ - topLeftRayZ,
+                    yDist = squareRoot(sqr(TLtoBLX) + sqr(TLtoBLY) + sqr(TLtoBLZ)),
+                    xDist = squareRoot(sqr(TLtoTRX) + sqr(TLtoBLY) + sqr(TLtoBLZ)),
+                    yProjScale = projDist(TLtoObjX, TLtoObjY, TLtoObjZ,
+                                          TLtoBLX, TLtoBLY, TLtoBLZ),
+                    xProjScale = projDist(TLtoObjX, TLtoObjY, TLtoObjZ,
+                                          TLtoTRX, TLtoTRY, TLtoTRZ),
+                    yProj = yProjScale * yDist,
+                    xProj = xProjScale * xDist;
+                if (yProj >= -Objects[objStart + 12] && yProj <= yDist + Objects[objStart + 12] &&
+                    xProj >= -Objects[objStart + 12] && xProj <= xDist + Objects[objStart + 12]) {
+                    return 1;
+                }
+            }
+            objStart += objLen;
+        }
+        return 0;
+    }, opt);
+    return y;
+}
 var precompute = generatePrecompute(camera,lights,objects);
 
 var mykernel = doit("gpu");
 var mycode   = doit("cpu");
+var myKernalSegments = calculateSegments("gpu");
+var myCodeSegments = calculateSegments("cpu");
 mykernel(camera,lights,objects,precompute);
 var canvas = mykernel.getCanvas();
 document.getElementsByTagName('body')[0].appendChild(canvas);
@@ -293,17 +410,20 @@ function renderLoop() {
     f.innerHTML = fps.getFPS();
     if (selection === 0) {
         mycode(camera,lights,objects,precompute);
+        var seg = myCodeSegments(camera,objects,precompute);
         var cv = document.getElementsByTagName("canvas")[0];
         var bdy = cv.parentNode;
         var newCanvas = mycode.getCanvas();
         bdy.replaceChild(newCanvas, cv);
     } else {
         mykernel(camera,lights,objects,precompute);
+        seg = myKernalSegments(camera,objects,precompute);
         cv = document.getElementsByTagName("canvas")[0];
         bdy = cv.parentNode;
         newCanvas = mykernel.getCanvas();
         bdy.replaceChild(newCanvas, cv);
     }
+    console.log(seg);
     //i += .01;
     //lights[1] = 10 * Math.cos(i);
     //lights[2] = 10 * Math.sin(i);
