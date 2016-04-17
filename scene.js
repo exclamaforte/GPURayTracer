@@ -50,3 +50,9 @@ var lights = [
     0,10,0,  1,1,1,
     10,0,0,  1,1,1
 ];
+
+var cw = document.createElement("canvas");
+cw.width = PWPC;
+cw.height = PHPC;
+var WHITE = cw.getContext("2d");
+WHITE.fillRect(0,0,PWPC,PHPC);
