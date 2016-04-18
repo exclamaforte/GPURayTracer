@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html>
   <body>
+    <h2>Sphere Spinning Demo</h2>
     <input type="button" value="Using CPU" onclick="return change(this);">
     <input type="button" value="Pause" onclick="return pause(this);">
-    <input type="button" value="Segment" onclick="return toggleSegment(this);">
+    <input type="button" value="Clipping" onclick="return toggleSegment(this);">
+    <input type="button" value="Up" onclick="return modifyCount(1);">
+    <input type="button" value="Down" onclick="return modifyCount(-1);">
     <div id="fps">14</div>
+    <p>Click Clipping to begin the Clipping. Note that whatever is clipped is colored black, for illustration purposes.</p>
   </body>
   <script src="scene.js"></script>
   <script src="gpu.js"></script>
